@@ -1,4 +1,7 @@
+export type ModelProvider = "openai" | "ollama" | "gemini" | "huggingface";
+
 export type ModelSettings = {
+  provider?: ModelProvider;
   customApiKey?: string;
   customModelName?: string;
   customTemperature?: number;

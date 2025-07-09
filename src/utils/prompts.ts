@@ -1,9 +1,21 @@
 import { OpenAI } from "langchain/llms/openai";
+import { Ollama } from "langchain/llms/ollama";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { HuggingFaceHub } from "langchain/llms/hf";
 import { PromptTemplate } from "langchain/prompts";
 import type { ModelSettings } from "./types";
 import { GPT_35_TURBO } from "./constants";
+import {
+  OLLAMA_API_BASE_URL,
+  DEFAULT_OLLAMA_MODEL,
+  GEMINI_API_KEY,
+  DEFAULT_GEMINI_MODEL,
+  HUGGINGFACE_API_KEY,
+  DEFAULT_HUGGINGFACE_MODEL,
+  HUGGINGFACE_API_BASE_URL
+} from "./config"; // Import new configs
 
-const getServerSideKey = (): string => {
+const getOpenAIServerSideKey = (): string => {
   const keys: string[] = (process.env.OPENAI_API_KEY || "")
     .split(",")
     .map((key) => key.trim())
@@ -13,23 +25,63 @@ const getServerSideKey = (): string => {
 };
 
 export const createModel = (settings: ModelSettings) => {
-  let _settings: ModelSettings | undefined = settings;
-  if (!settings.customApiKey) {
-    _settings = undefined;
+  const provider = settings.provider || "openai"; // Default to openai if no provider is set
+  const temperature = settings.customTemperature || 0.9;
+  const maxTokens = settings.customMaxTokens || 400;
+
+  switch (provider) {
+    case "ollama":
+      return new Ollama({
+        baseUrl: settings.customEndPoint || OLLAMA_API_BASE_URL,
+        model: settings.customModelName || DEFAULT_OLLAMA_MODEL,
+        temperature,
+        // Ollama doesn't directly support maxTokens in the same way,
+        // it's often controlled by the model's parameters or a different setting.
+        // We can pass it if the Langchain Ollama class supports it, or omit it.
+        // For now, let's assume it might be part of model specific parameters or context window.
+      });
+    case "gemini":
+      if (!settings.customApiKey && !GEMINI_API_KEY) {
+        throw new Error("Gemini API Key not found. Please set it in the settings or environment variables.");
+      }
+      return new ChatGoogleGenerativeAI({
+        apiKey: settings.customApiKey || GEMINI_API_KEY,
+        modelName: settings.customModelName || DEFAULT_GEMINI_MODEL,
+        temperature,
+        maxOutputTokens: maxTokens,
+      });
+    case "huggingface":
+      if (!settings.customApiKey && !HUGGINGFACE_API_KEY) {
+        // Allow anonymous usage if no API key is provided, depending on HuggingFaceHub's behavior
+        // Or throw an error if a key is strictly required for the desired models.
+        // For now, we'll proceed, but this might need adjustment based on testing.
+      }
+      return new HuggingFaceHub({
+        apiKey: settings.customApiKey || HUGGINGFACE_API_KEY,
+        model: settings.customModelName || DEFAULT_HUGGINGFACE_MODEL,
+        // HuggingFaceHub parameters can vary; temperature and maxTokens are common.
+        // The endpoint parameter can be used for self-hosted inference endpoints.
+        endpoint: settings.customEndPoint || HUGGINGFACE_API_BASE_URL,
+        temperature,
+        maxTokens,
+      });
+    case "openai":
+    default:
+      let _settings: ModelSettings | undefined = settings;
+      if (!settings.customApiKey) {
+        _settings = undefined;
+      }
+      const options = {
+        openAIApiKey: _settings?.customApiKey || getOpenAIServerSideKey(),
+        temperature: temperature,
+        modelName: _settings?.customModelName || GPT_35_TURBO,
+        maxTokens: maxTokens,
+      };
+      const baseOptions = {
+        basePath: _settings?.customEndPoint || undefined,
+      };
+      return new OpenAI(options, baseOptions);
   }
-
-  const options = {
-    openAIApiKey: _settings?.customApiKey || getServerSideKey(),
-    temperature: _settings?.customTemperature || 0.9,
-    modelName: _settings?.customModelName || GPT_35_TURBO,
-    maxTokens: _settings?.customMaxTokens || 400,
-  };
-
-  const baseOptions = {
-    basePath: _settings?.customEndPoint || undefined,
-  };
-
-  return new OpenAI(options, baseOptions);
 };
 
 export const startGoalPrompt = new PromptTemplate({
