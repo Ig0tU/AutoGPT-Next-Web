@@ -1,8 +1,8 @@
-import { OpenAI } from "langchain/llms/openai";
-import { Ollama } from "langchain/llms/ollama";
+import { OpenAI } from "langchain/llms/openai"; // Assuming this path is still valid from 'langchain' package
+import { Ollama } from "@langchain/community/llms/ollama";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { HuggingFaceHub } from "langchain/llms/hf";
-import { PromptTemplate } from "langchain/prompts";
+import { HuggingFaceHub } from "@langchain/community/llms/hf";
+import { PromptTemplate } from "langchain/prompts"; // Assuming this path is still valid
 import type { ModelSettings } from "./types";
 import { GPT_35_TURBO } from "./constants";
 import {
